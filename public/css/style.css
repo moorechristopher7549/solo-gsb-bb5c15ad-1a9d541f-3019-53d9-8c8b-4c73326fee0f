@@ -192,6 +192,54 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
   background: rgba(179, 38, 30, 0.04);
 }
 
+/* ========== 修订对照（仅左侧面板，打印时随面板隐藏） ========== */
+.rev-count { float: right; font-weight: 400; }
+.rev-count.over { color: var(--danger); font-weight: 600; }
+
+.diff-view {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.diff-ins {
+  background: rgba(47, 111, 68, 0.16);
+  color: #2f6f44;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+.diff-del {
+  background: rgba(179, 38, 30, 0.12);
+  color: var(--danger);
+  text-decoration: line-through;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+.diff-meta,
+.ver-stats {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 6px;
+  color: var(--muted);
+}
+.ver-stat.ok { color: #2f6f44; }
+.ver-stat.err { color: var(--danger); font-weight: 600; }
+
+.version-pick .pick-row { display: flex; gap: 18px; }
+.version-pick label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+.version-pick input[type="radio"] { margin: 0; }
+
 /* ========== 打印：#label 即页面，物理尺寸 1:1 ========== */
 @page { margin: 0; }
 

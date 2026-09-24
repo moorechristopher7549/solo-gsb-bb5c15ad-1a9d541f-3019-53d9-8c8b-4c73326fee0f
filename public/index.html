@@ -27,6 +27,26 @@
       <textarea id="bodyEn" rows="6" placeholder="填写后进入中英对照双栏模式：标题横跨整签，中文原文与译文左右并列。"></textarea>
     </label>
 
+    <label class="field">
+      <span class="field-label">修订稿（中文，≤300 字；留空则不对照）<span id="revCount" class="rev-count">0 / 300</span></span>
+      <textarea id="bodyRev" rows="5" maxlength="300" placeholder="输入修订后的中文正文。填写后自动生成增删对照，原稿与修订稿分别排版。"></textarea>
+    </label>
+
+    <div id="diffWrap" class="field" hidden>
+      <span class="field-label">修订对照（<span class="diff-del">删除</span> / <span class="diff-ins">新增</span>，仅此处显示，不进入打印）</span>
+      <div id="diffView" class="diff-view"></div>
+      <div id="diffMeta" class="diff-meta"></div>
+      <div id="verStats" class="ver-stats"></div>
+    </div>
+
+    <div id="versionPick" class="field version-pick" hidden>
+      <span class="field-label">成品版本（预览与打印仅输出所选版）</span>
+      <div class="pick-row">
+        <label><input id="finalOrig" type="radio" name="finalVer" value="orig" checked> 原稿</label>
+        <label><input id="finalRev" type="radio" name="finalVer" value="rev"> 修订稿</label>
+      </div>
+    </div>
+
     <div class="field-row">
       <label class="field">
         <span class="field-label">标签宽 (mm)</span>
@@ -56,6 +76,10 @@
         <li><strong>中英对照双栏</strong>：填写英文译文后，标题横跨整签，中文原文与译文在正文区左右并列（栏间距 6mm），
           两栏按各自实际栏宽独立断行，取<strong>两栏都能容纳的最大共享字号</strong>，高度按较高一栏与标题共同核算；
           译文留空则保持现有单栏。</li>
+        <li><strong>修订对照</strong>：填写修订稿（≤300 字）后，按 Unicode 字符对原稿与修订稿求<strong>最短增删对齐</strong>
+          （同代价时固定保留原文较早字符），对照区以删除线标出删除片段、底色标出新增片段；
+          原稿与修订稿分别沿用当前尺寸与英文译文排版，可任选一版作为成品预览与打印，差异标记不进入打印；
+          所选版排不下时对照保留、提示超宽或超高并禁用打印。</li>
         <li>打印输出与预览<strong>同换行、同物理尺寸</strong>（毫米）。</li>
       </ul>
     </details>

@@ -16,6 +16,15 @@
     title: document.getElementById('title'),
     body: document.getElementById('body'),
     bodyEn: document.getElementById('bodyEn'),
+    bodyRev: document.getElementById('bodyRev'),
+    revCount: document.getElementById('revCount'),
+    diffWrap: document.getElementById('diffWrap'),
+    diffView: document.getElementById('diffView'),
+    diffMeta: document.getElementById('diffMeta'),
+    verStats: document.getElementById('verStats'),
+    versionPick: document.getElementById('versionPick'),
+    finalOrig: document.getElementById('finalOrig'),
+    finalRev: document.getElementById('finalRev'),
     widthMm: document.getElementById('widthMm'),
     heightMm: document.getElementById('heightMm'),
     printBtn: document.getElementById('printBtn'),
@@ -28,6 +37,8 @@
     labelBodyEn: document.getElementById('labelBodyEn'),
     labelError: document.getElementById('labelError')
   };
+
+  var REV_MAX_CHARS = 300; // 修订稿字数上限（按 Unicode 码位计）
 
   // ---------- Canvas 实际字宽测量（按 font 分别缓存） ----------
   // 正文与标题（加粗、1.4×）字号不同：每 font 一个独立 context，
@@ -226,6 +237,80 @@
     el.labelBodyEn.hidden = !dual;
   }
 
+  // ---------- 修订对照 ----------
+  function cpLen(s) { return Array.from(s).length; }
+
+  // 传给排版器的一版输入：除中文正文外（标题/译文/尺寸）两版完全相同
+  function layoutInput(input, bodyText) {
+    return {
+      titleTrim: input.titleTrim,
+      bodyTrim: bodyText,
+      enTrim: input.enTrim,
+      dual: input.dual,
+      widthMm: input.widthMm,
+      heightMm: input.heightMm
+    };
+  }
+
+  // 把对齐结果渲染到对照区：删除片段加删除线、新增片段加底色；
+  // 删除/新增片段内的换行符以 ↵ 显形。差异标记只存在于面板对照区。
+  function renderDiff(ops) {
+    el.diffView.innerHTML = '';
+    var stats = { del: 0, ins: 0, delSeg: 0, insSeg: 0 };
+    var frag = document.createDocumentFragment();
+    ops.forEach(function (op) {
+      if (op.type === 'keep') {
+        frag.appendChild(document.createTextNode(op.text));
+        return;
+      }
+      var span = document.createElement('span');
+      span.className = op.type === 'del' ? 'diff-del' : 'diff-ins';
+      span.textContent = op.text.replace(/\n/g, '↵\n');
+      frag.appendChild(span);
+      if (op.type === 'del') { stats.del += cpLen(op.text); stats.delSeg++; }
+      else { stats.ins += cpLen(op.text); stats.insSeg++; }
+    });
+    el.diffView.appendChild(frag);
+    el.diffMeta.textContent = (!stats.del && !stats.ins)
+      ? '两版文字完全一致，无增删。'
+      : '对照结果：删除 ' + stats.del + ' 字（' + stats.delSeg + ' 段），新增 ' +
+        stats.ins + ' 字（' + stats.insSeg + ' 段）。';
+  }
+
+  // 一版的排版结论：正文字号、中文行数、能否容纳
+  function versionStatLine(name, selected, result) {
+    var head = name + (selected ? '（成品）' : '') + '：';
+    if (result.ok) {
+      return {
+        ok: true,
+        text: head + '正文 ' + result.bodyPx + 'px，中文 ' +
+          (result.zhPlan ? result.zhPlan.totalLines : 0) + ' 行，可容纳'
+      };
+    }
+    var reason = result.reason === 'width' ? '超宽'
+      : result.reason === 'height' ? '超高' : '尺寸无效';
+    return { ok: false, text: head + '排不下（' + reason + '）' };
+  }
+
+  function renderVerStats(results, selKey) {
+    el.verStats.innerHTML = '';
+    ['orig', 'rev'].forEach(function (key) {
+      var line = versionStatLine(key === 'orig' ? '原稿' : '修订稿', key === selKey, results[key]);
+      var div = document.createElement('div');
+      div.className = 'ver-stat ' + (line.ok ? 'ok' : 'err');
+      div.textContent = line.text;
+      el.verStats.appendChild(div);
+    });
+    var a = results.orig, b = results.rev;
+    if (a.ok && b.ok) {
+      var div = document.createElement('div');
+      div.className = 'ver-stat';
+      div.textContent = '变化：正文字号 ' + a.bodyPx + '→' + b.bodyPx + 'px，中文行数 ' +
+        (a.zhPlan ? a.zhPlan.totalLines : 0) + '→' + (b.zhPlan ? b.zhPlan.totalLines : 0);
+      el.verStats.appendChild(div);
+    }
+  }
+
   var lastGood = null;
 
   function render() {
@@ -233,13 +318,23 @@
       title: el.title.value,
       body: el.body.value,
       bodyEn: el.bodyEn.value,
+      bodyRev: el.bodyRev.value,
       widthMm: parseFloat(el.widthMm.value),
       heightMm: parseFloat(el.heightMm.value)
     };
     input.titleTrim = input.title.trim();
     input.bodyTrim = input.body.trim();
     input.enTrim = input.bodyEn.trim();
+    input.revTrim = input.bodyRev.trim();
     input.dual = input.enTrim.length > 0;
+
+    // 修订稿非空即进入对照模式；字数按 Unicode 码位统计
+    var comparing = input.revTrim.length > 0;
+    var revCount = cpLen(input.bodyRev);
+    el.revCount.textContent = revCount + ' / ' + REV_MAX_CHARS;
+    el.revCount.classList.toggle('over', revCount > REV_MAX_CHARS);
+    el.diffWrap.hidden = !comparing;
+    el.versionPick.hidden = !comparing;
 
     setDualMode(input.dual);
 
@@ -251,21 +346,44 @@
       return;
     }
 
-    var result = computeLayout(input);
+    if (comparing && revCount > REV_MAX_CHARS) {
+      setStatus('修订稿超过 ' + REV_MAX_CHARS + ' 字（当前 ' + revCount +
+        ' 字），请精简至 ' + REV_MAX_CHARS + ' 字以内。', 'err');
+      showError('修订稿超过 ' + REV_MAX_CHARS + ' 字\n（当前 ' + revCount + ' 字）');
+      el.printBtn.disabled = true;
+      fitScale();
+      return;
+    }
+
+    // 最短增删对照：只渲染在面板对照区，差异标记不进入展签与打印
+    if (comparing) {
+      renderDiff(window.LabelLayout.diffChars(input.bodyTrim, input.revTrim));
+    }
+
+    // 原稿与修订稿分别沿用当前尺寸与英文译文运行同一排版
+    var selKey = comparing && el.finalRev.checked ? 'rev' : 'orig';
+    var results = { orig: computeLayout(layoutInput(input, input.bodyTrim)) };
+    if (comparing) {
+      results.rev = computeLayout(layoutInput(input, input.revTrim));
+      renderVerStats(results, selKey);
+    }
+
+    var result = results[selKey];
+    var prefix = comparing ? '成品·' + (selKey === 'rev' ? '修订稿' : '原稿') + '：' : '';
 
     if (!result.ok) {
       var msg;
       if (result.reason === 'config') {
         msg = result.message;
-        setStatus(msg, 'err');
+        setStatus(prefix + msg, 'err');
         showError('标签尺寸过小\n' + msg);
       } else if (result.reason === 'width') {
         msg = widthFailureMessage(result, input.dual);
-        setStatus(msg, 'err');
+        setStatus(prefix + msg, 'err');
         showError(msg);
       } else {
         msg = heightFailureMessage(result, input.dual);
-        setStatus(msg, 'err');
+        setStatus(prefix + msg, 'err');
         showError(msg);
       }
       el.printBtn.disabled = true;
@@ -305,7 +423,7 @@
     }
 
     var usedH = Math.round(result.contentH / PX_PER_MM);
-    var info = '正文字号 ' + result.bodyPx + 'px（标题 ' +
+    var info = prefix + '正文字号 ' + result.bodyPx + 'px（标题 ' +
       Math.round(result.titlePx * 10) / 10 + 'px）';
     if (result.dual) {
       info += '，双栏栏宽约 ' + Math.round(result.colWMm) + 'mm';
@@ -376,8 +494,11 @@
     el.title.addEventListener(evt, schedule);
     el.body.addEventListener(evt, schedule);
     el.bodyEn.addEventListener(evt, schedule);
+    el.bodyRev.addEventListener(evt, schedule);
     el.widthMm.addEventListener(evt, schedule);
     el.heightMm.addEventListener(evt, schedule);
+    el.finalOrig.addEventListener(evt, schedule);
+    el.finalRev.addEventListener(evt, schedule);
   });
 
   el.printBtn.addEventListener('click', function () { window.print(); });

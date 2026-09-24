@@ -11,6 +11,11 @@
  * 断行算法：动态规划。在满足宽度与标点规则的所有可行排法中，
  * 最小化「非末行的空白宽度平方和」（与 TeX 段落断行同一思想），
  * 代价比相同时取行数更少、断点更靠右的方案，保证结果确定唯一。
+ *
+ * 增删对齐：diffChars(oldText, newText) 按 Unicode 码位求最短增删对齐
+ * （LCS，只允许插入/删除，一次替换计为一删一增）。回溯时同代价固定按
+ * 「删除 > 匹配 > 插入」取舍，效果是被保留的总是原文中较早出现的字符，
+ * 结果确定唯一。
  */
 (function (global) {
   'use strict';
@@ -315,11 +320,87 @@
     return { paragraphs: out, totalLines: totalLines, maxLineWidth: maxLineWidth };
   }
 
+  /**
+   * 最短增删对齐（按 Unicode 码位，只允许插入/删除）。
+   * @param {string} oldText 原稿
+   * @param {string} newText 修订稿
+   * @returns {Array<{type:'keep'|'del'|'ins', text:string}>}
+   *          按阅读顺序排列、相邻同类已合并的片段；
+   *          del 片段来自原稿，ins 片段来自修订稿。
+   *
+   * 同代价时的确定规则：回溯优先「删除」、其次「匹配」、最后「插入」，
+   * 即被保留（匹配）的总是原文中尽可能靠前的字符。
+   */
+  function diffChars(oldText, newText) {
+    var a = Array.from(String(oldText == null ? '' : oldText));
+    var b = Array.from(String(newText == null ? '' : newText));
+    var m = a.length, n = b.length;
+    if (m === 0 && n === 0) return [];
+
+    // LCS 长度表 (m+1) x (n+1)，行主序
+    var W = n + 1;
+    var dp = new Uint32Array((m + 1) * W);
+    for (var i = 1; i <= m; i++) {
+      var ai = a[i - 1];
+      var row = i * W, prev = (i - 1) * W;
+      for (var j = 1; j <= n; j++) {
+        dp[row + j] = ai === b[j - 1]
+          ? dp[prev + j - 1] + 1
+          : Math.max(dp[prev + j], dp[row + j - 1]);
+      }
+    }
+
+    // 回溯：删除 > 匹配 > 插入（均为当前最短路径上的合法移动）
+    var ops = [];
+    var x = m, y = n;
+    while (x > 0 && y > 0) {
+      if (dp[(x - 1) * W + y] === dp[x * W + y]) {
+        ops.push({ t: 'del', c: a[x - 1] }); x--;
+      } else if (a[x - 1] === b[y - 1] && dp[(x - 1) * W + y - 1] + 1 === dp[x * W + y]) {
+        ops.push({ t: 'keep', c: a[x - 1] }); x--; y--;
+      } else {
+        ops.push({ t: 'ins', c: b[y - 1] }); y--;
+      }
+    }
+    while (x > 0) { ops.push({ t: 'del', c: a[x - 1] }); x--; }
+    while (y > 0) { ops.push({ t: 'ins', c: b[y - 1] }); y--; }
+    ops.reverse();
+
+    // 合并相邻同类片段
+    var merged = [];
+    for (var k = 0; k < ops.length; k++) {
+      var last = merged[merged.length - 1];
+      if (last && last.type === ops[k].t) last.text += ops[k].c;
+      else merged.push({ type: ops[k].t, text: ops[k].c });
+    }
+
+    // 展示约定：相邻的「增 + 删」片段对固定调换为「删在前、增在后」
+    // （与常见 diff 一致；只影响相邻片段的展示顺序，不改变对齐结果）。
+    var swapped = [];
+    for (var s = 0; s < merged.length; s++) {
+      var cur = merged[s];
+      if (cur.type === 'ins' && s + 1 < merged.length && merged[s + 1].type === 'del') {
+        swapped.push(merged[s + 1], cur);
+        s++;
+      } else {
+        swapped.push(cur);
+      }
+    }
+    var out = [];
+    for (var r = 0; r < swapped.length; r++) {
+      var tail = out[out.length - 1];
+      if (tail && tail.type === swapped[r].type) tail.text += swapped[r].text;
+      else out.push({ type: swapped[r].type, text: swapped[r].text });
+    }
+    return out;
+  }
+
   var api = {
     PX_PER_MM: PX_PER_MM,
     tokenize: tokenize,
     planParagraph: planParagraph,
     planText: planText,
+    diffChars: diffChars,
     isWordCode: isWordCode,
     isCJKCode: isCJKCode
   };
