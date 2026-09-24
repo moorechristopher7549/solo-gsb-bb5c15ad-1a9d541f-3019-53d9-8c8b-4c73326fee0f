@@ -114,6 +114,113 @@ button:disabled { background: #aaa5; cursor: not-allowed; }
 .help summary { cursor: pointer; color: var(--ink); margin-bottom: 6px; }
 .help ul { padding-left: 18px; margin: 0; }
 
+/* ========== 修订稿与修订对照 ========== */
+.field-hint {
+  display: block;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.field-hint.over { color: var(--danger); font-weight: 600; }
+
+.compare {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  margin-bottom: 14px;
+}
+.compare-title {
+  font-size: 13px;
+  margin: 0 0 8px;
+  letter-spacing: 1px;
+}
+.compare-sub {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+/* 差异视图：新增绿色、删除红色删除线；仅屏幕对照用，打印时随面板隐藏 */
+.diff-view {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.9;
+  max-height: 200px;
+  overflow: auto;
+  word-break: break-all;
+}
+.diff-view del {
+  color: var(--danger);
+  background: rgba(179, 38, 30, 0.10);
+  text-decoration: line-through;
+  border-radius: 2px;
+}
+.diff-view ins {
+  color: #1e7b34;
+  background: rgba(30, 123, 52, 0.12);
+  text-decoration: none;
+  border-bottom: 1px solid #1e7b34;
+  border-radius: 2px;
+}
+.diff-view .nl {
+  font-style: normal;
+  font-size: 10px;
+  padding: 0 1px;
+}
+
+.diff-stats {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0 8px;
+}
+
+/* 两版排版对比表 */
+.fit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.fit-table th,
+.fit-table td {
+  border: 1px solid var(--line);
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.fit-table th {
+  background: #f0f1f4;
+  font-weight: 600;
+}
+.fit-table td.good { color: #2f6f44; }
+.fit-table td.bad { color: var(--danger); }
+
+.fit-delta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.version-pick {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+.version-pick > span { color: var(--muted); font-size: 12px; }
+.version-pick label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.version-pick input { width: auto; margin: 0; }
+
 /* ========== 右侧预览舞台 ========== */
 .stage-wrap { overflow: auto; }
 .stage {
